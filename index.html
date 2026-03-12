@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaTest — Trading Strategy Backtester</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
+<body>
+
+  <div class="loading-overlay" id="loading">
+    <div class="loader-box">
+      <div class="spinner"></div>
+      <div class="loading-title">Running Backtest</div>
+      <div class="loading-sub" id="loadingMsg">Generating price data...</div>
+    </div>
+  </div>
+
+  <div class="app">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">▲</span>
+        <div>
+          <div class="logo-name">AlphaTest</div>
+          <div class="logo-sub">Strategy Backtester</div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Stock</div>
+        <select id="stockSelect" class="select-field">
+          <option value="AAPL">AAPL — Apple</option>
+          <option value="MSFT">MSFT — Microsoft</option>
+          <option value="GOOGL">GOOGL — Google</option>
+          <option value="AMZN">AMZN — Amazon</option>
+          <option value="NVDA">NVDA — Nvidia</option>
+          <option value="JPM">JPM — JP Morgan</option>
+          <option value="TSLA">TSLA — Tesla</option>
+          <option value="META">META — Meta</option>
+        </select>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Strategy</div>
+        <select id="strategySelect" class="select-field" onchange="onStrategyChange()">
+          <option value="sma_cross">SMA Crossover</option>
+          <option value="rsi">RSI Reversal</option>
+          <option value="bollinger">Bollinger Bands</option>
+          <option value="macd">MACD Signal</option>
+        </select>
+      </div>
+
+      <!-- Strategy params panel -->
+      <div id="paramsPanel"></div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Period</div>
+        <select id="periodSelect" class="select-field">
+          <option value="1">1 Year</option>
+          <option value="2" selected>2 Years</option>
+          <option value="3">3 Years</option>
+          <option value="5">5 Years</option>
+        </select>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Starting Capital ($)</div>
+        <input type="number" id="capitalInput" class="input-field" value="10000" min="1000" step="1000" />
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-label">Commission per Trade ($)</div>
+        <input type="number" id="commissionInput" class="input-field" value="1" min="0" step="0.5" />
+      </div>
+
+      <button class="run-btn" onclick="runBacktestUI()">▶ &nbsp;Run Backtest</button>
+
+      <div class="strategy-explainer" id="strategyExplainer"></div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main">
+
+      <div class="top-bar">
+        <div class="top-bar-left">
+          <span class="top-title" id="topTitle">Select a strategy and run backtest</span>
+          <span class="top-sub" id="topSub">AlphaTest · Strategy Backtester</span>
+        </div>
+        <div class="top-bar-right">
+          <div class="live-dot-wrap"><div class="live-dot"></div><span>Simulated Data</span></div>
+        </div>
+      </div>
+
+      <!-- KPI Row -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">Total Return</div>
+          <div class="kpi-value" id="kpi-return">—</div>
+          <div class="kpi-sub" id="kpi-return-sub">vs Buy &amp; Hold</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Final Portfolio Value</div>
+          <div class="kpi-value" id="kpi-value">—</div>
+          <div class="kpi-sub" id="kpi-value-sub">Starting capital</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Total Trades</div>
+          <div class="kpi-value" id="kpi-trades">—</div>
+          <div class="kpi-sub" id="kpi-trades-sub">Buy + Sell signals</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Win Rate</div>
+          <div class="kpi-value" id="kpi-winrate">—</div>
+          <div class="kpi-sub" id="kpi-winrate-sub">Profitable trades</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Sharpe Ratio</div>
+          <div class="kpi-value" id="kpi-sharpe">—</div>
+          <div class="kpi-sub" id="kpi-sharpe-sub">Risk-adjusted return</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Max Drawdown</div>
+          <div class="kpi-value" id="kpi-drawdown">—</div>
+          <div class="kpi-sub" id="kpi-drawdown-sub">Largest peak-to-trough</div>
+        </div>
+      </div>
+
+      <!-- Price + signals chart -->
+      <div class="chart-card wide">
+        <div class="chart-header">
+          <div>
+            <div class="chart-title" id="priceChartTitle">Price Chart</div>
+            <div class="chart-desc">Price history with buy (▲) and sell (▼) signals overlaid</div>
+          </div>
+          <div class="legend" id="priceLegend"></div>
+        </div>
+        <div class="chart-wrap" style="height:300px">
+          <canvas id="priceChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Equity curve + drawdown -->
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Equity Curve</div>
+              <div class="chart-desc">Strategy vs Buy &amp; Hold portfolio value over time</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="equityChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Drawdown</div>
+              <div class="chart-desc">% decline from peak portfolio value</div>
+            </div>
+          </div>
+          <div class="chart-wrap" style="height:220px">
+            <canvas id="drawdownChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade distribution + monthly returns -->
+      <div class="chart-row">
+        <div class="chart-card">
+          <div class="chart-title">Trade P&amp;L Distribution</div>
+          <div class="chart-desc">Profit and loss per closed trade</div>
+          <div class="chart-wrap" style="height:200px">
+            <canvas id="tradeChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Monthly Returns</div>
+          <div class="chart-desc">Strategy return per calendar month</div>
+          <div class="chart-wrap" style="height:200px">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trade log -->
+      <div class="chart-card wide">
+        <div class="chart-title">Trade Log</div>
+        <div class="chart-desc">Every executed trade with entry, exit, and P&amp;L</div>
+        <div class="table-wrap">
+          <table id="tradeTable">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Type</th>
+                <th>Entry Date</th>
+                <th>Entry Price</th>
+                <th>Exit Date</th>
+                <th>Exit Price</th>
+                <th>Shares</th>
+                <th>P&amp;L ($)</th>
+                <th>P&amp;L (%)</th>
+                <th>Result</th>
+              </tr>
+            </thead>
+            <tbody id="tradeBody">
+              <tr><td colspan="10" class="empty-row">Run a backtest to see trades</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="assets/js/data.js"></script>
+  <script src="assets/js/indicators.js"></script>
+  <script src="assets/js/strategies.js"></script>
+  <script src="assets/js/engine.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/ui.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
