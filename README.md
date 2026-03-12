@@ -9,6 +9,12 @@
 
 ---
 
+
+
+![alphatest Dashboard](Alphapic.png)
+
+
+
 ## What it does
 
 AlphaTest simulates what would have happened if you ran a trading strategy on a stock over the past 1–5 years. It shows you:
